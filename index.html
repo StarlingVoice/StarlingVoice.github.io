@@ -266,6 +266,26 @@
             margin-right: 4px;
             opacity: 0.7;
         }
+
+        .loading-text {
+            font-size: 0.7rem;
+            color: var(--primary-blue);
+            font-style: italic;
+            display: none; /* 默认隐藏 */
+            margin-left: 5px;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* 当父级处于加载状态时显示 */
+        .audio-player.is-loading .loading-text {
+            display: inline-block;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -405,36 +425,44 @@
             return `<div class="waveform-container">${barsHtml}</div>`;
         }
 
+    
         function buildAudioPlayer(dataset, method, id, isRef = false) {
             let filePath = '';
             if (currentTask === 'cloning') {
                 filePath = `data/${dataset}/${isRef ? 'StarlingVoice' : method}/${id}/${method === 'GT' ? 'REF' : 'TTS'}-${id}.wav`;
             } else {
-                // design 任务的文件路径
                 filePath = `data/${dataset}/${isRef ? 'StarlingVoice' : method}/${id}/${method === 'GT' ? 'GT' : 'VD'}-${id}.wav`;
             }
 
             const isOurs = method === "StarlingVoice";
             const audioId = `audio-${method.replace(/[^a-zA-Z0-9]/g, '')}-${id}-${isRef ? 'ref' : ''}`;
             
-            // Handle Ground Truth label dynamically
             let labelHtml = method;
             if (isRef) {
                 labelHtml = currentTask === 'design' ? 'Ground Truth' : 'Reference Prompt';
             }
             
             return `
-                <div class="audio-player ${isOurs ? 'ours' : ''} ${isRef ? 'ref-player' : ''}">
+                <div class="audio-player ${isOurs ? 'ours' : ''} ${isRef ? 'ref-player' : ''}" id="container-${audioId}">
                     <div class="play-btn" id="btn-${audioId}" onclick="toggleAudio('${audioId}', this)">▶</div>
-                    <div class="audio-label">${labelHtml}</div>
+                    <div class="audio-label">
+                        ${labelHtml}
+                        <span class="loading-text" id="load-${audioId}">Loading... / 正在加载中</span>
+                    </div>
                     
                     <div class="player-core">
                         ${buildWaveformHtml()}
                         <input type="range" class="progress-slider" id="slider-${audioId}" value="0" min="0" max="100" step="0.1" 
-                               oninput="seekAudio(this, '${audioId}')" onchange="seekAudio(this, '${audioId}')">
+                            oninput="seekAudio(this, '${audioId}')" onchange="seekAudio(this, '${audioId}')">
                     </div>
                     
-                    <audio id="${audioId}" src="${filePath}" onended="resetPlayButton('${audioId}')" ontimeupdate="updateProgress('${audioId}')"></audio>
+                    <audio id="${audioId}" src="${filePath}" 
+                        onwaiting="document.getElementById('container-${audioId}').classList.add('is-loading')" 
+                        onplaying="document.getElementById('container-${audioId}').classList.remove('is-loading')"
+                        oncanplay="document.getElementById('container-${audioId}').classList.remove('is-loading')"
+                        onended="resetPlayButton('${audioId}')" 
+                        ontimeupdate="updateProgress('${audioId}')">
+                    </audio>
                 </div>
             `;
         }
@@ -607,7 +635,11 @@
             if (currentPlayingAudio) {
                 currentPlayingAudio.pause();
                 currentPlayingAudio.currentTime = 0;
-                // Force slider back to 0
+                
+                // 👉 新增：移除加载状态
+                const container = document.getElementById(`container-${currentPlayingAudio.id}`);
+                if(container) container.classList.remove('is-loading');
+
                 const slider = document.getElementById(`slider-${currentPlayingAudio.id}`);
                 if (slider) slider.value = 0;
                 
@@ -622,6 +654,7 @@
                 btnElement.innerHTML = '▶';
                 btnElement.classList.remove('playing');
                 parentPlayer.classList.remove('is-playing');
+                parentPlayer.classList.remove('is-loading'); // 👉 新增：重置时移除加载提示
                 
                 const bars = parentPlayer.querySelectorAll('.waveform-bar');
                 bars.forEach(bar => bar.style.height = `${4 + Math.random() * 6}px`);
@@ -637,3 +670,4 @@
     </script>
 </body>
 </html>
+>>>>>>> 6b383d4 (Updated)
